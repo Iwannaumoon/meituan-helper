@@ -224,14 +224,14 @@ async function processImageOCR(imgDataUrl, type) {
         
         // Load worker
         const worker = await Tesseract.createWorker('chi_sim', 1, {
-            langPath: 'https://cdn.jsdelivr.net/gh/naptha/tessdata@gh-pages/4.0.0_fast',
+            langPath: 'https://cdn.jsdelivr.net/gh/naptha/tessdata@gh-pages/4.0.0',
             logger: m => {
                 if (m.status === 'recognizing text') {
                     const progress = Math.round(m.progress * 70) + 30; // Scale from 30% to 100%
                     updateProgress(`识别中: ${Math.round(m.progress * 100)}%`, progress);
                 } else if (m.status === 'loading language traineddata') {
                     const progress = Math.round(m.progress * 25) + 5; // Scale from 5% to 30%
-                    updateProgress(`加载语言包: ${Math.round(m.progress * 100)}%`, progress);
+                    updateProgress(`加载高精模型: ${Math.round(m.progress * 100)}%`, progress);
                 }
             }
         });
@@ -272,25 +272,17 @@ function preprocessImage(imgDataUrl) {
             const ctx = canvas.getContext('2d');
             canvas.width = img.naturalWidth || img.width;
             canvas.height = img.naturalHeight || img.height;
-            
             ctx.drawImage(img, 0, 0);
             
             const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
             const data = imgData.data;
             
-            // Grayscale and Boost Contrast to make black text pop on white background
+            // Convert to grayscale only (retaining anti-aliasing, avoiding bumpy binarized text edges)
             for (let i = 0; i < data.length; i += 4) {
                 const r = data[i];
                 const g = data[i+1];
                 const b = data[i+2];
-                
-                // standard luminance formula
-                let v = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-                
-                // Increase contrast: amplify difference from mid-gray (128)
-                v = (v - 128) * 2.0 + 128;
-                v = Math.max(0, Math.min(255, v));
-                
+                const v = 0.299 * r + 0.587 * g + 0.114 * b;
                 data[i] = data[i+1] = data[i+2] = v;
             }
             
@@ -304,16 +296,16 @@ function preprocessImage(imgDataUrl) {
 function cleanAndExtractMerchants(text) {
     if (!text) return [];
     
-    // Split into lines and filter
     const lines = text.split('\n');
     const merchants = [];
     
-    // Words that indicate non-merchant details (scores, times, coupons, layout buttons)
+    // Expanded blocklist including common misread OCR terms for ratings/times/distances
     const blockList = [
-        '分', '评分', '月售', '单', '起送', '配送', '分钟', '米', 'km', 
-        '已领', '去拼单', '进店', '领券', '减', '返', '首单', '津贴',
-        '满', '元', '¥', '¥', '￥', '券', '到店', '评价', '好评', '在线',
-        '搜索', '红包', '推荐', '综合', '销量', '速度', '筛选', '我的'
+        '分', '评分', '月售', '起送', '配送', '分钟', '已领', '去拼单', 
+        '进店', '领券', '首单', '津贴', '到店', '评价', '好评', '在线',
+        '搜索', '红包', '推荐', '综合', '销量', '速度', '筛选', '我的',
+        '沸巾', '浅由', '清由', '加浅', '加清', '加由', '加尘', '尘雁', '潮丰',
+        '公里', 'k㎡', '以内', '以下'
     ];
     
     lines.forEach(rawLine => {
@@ -321,6 +313,12 @@ function cleanAndExtractMerchants(text) {
         
         // Remove spaces inside the line for clean text
         line = line.replace(/\s+/g, '');
+        
+        // 1. Remove leading symbols and short English/alphanumeric prefix junk (like ER, ES, aa, Y-, 1.) 
+        // which are usually misread merchant icons or tags
+        line = line.replace(/^[^a-zA-Z0-9\u4e00-\u9fa5]+/, ''); // Strip leading punctuation
+        line = line.replace(/^[a-zA-Z0-9\-\_\#]{1,3}(?=[\u4e00-\u9fa5])/, ''); // Strip short prefix codes followed by Chinese
+        line = line.replace(/^[^a-zA-Z0-9\u4e00-\u9fa5]+/, ''); // Strip leading punctuation again
         
         // Skip empty or super short/long lines
         if (line.length < 2 || line.length > 22) return;
@@ -333,25 +331,23 @@ function cleanAndExtractMerchants(text) {
         
         // Check block words
         const hasBlockWord = blockList.some(word => {
-            // Special regex to match things like "4.8分", "¥15" without blocking "面馆" etc.
+            // Special regex to match things like "4.8分" or rating digits
             if (word === '分') {
                 return /\d\.\d分/.test(line) || /^\d分/.test(line);
-            }
-            if (word === '元' || word === '¥' || word === '￥') {
-                return /\d+/.test(line); // numbers next to price symbols
             }
             return line.includes(word);
         });
         
         if (hasBlockWord) return;
         
-        // If line contains chain indicators like "麦当劳", "肯德基" etc., keep it
-        // Otherwise, merchant names usually contain at least one Chinese character
+        // Skip lines containing delivery time representations like "二加" or "三加"
+        if (line.startsWith('二加') || line.startsWith('三加') || line.startsWith('一加')) return;
+        
+        // Merchant names must contain at least one Chinese character
         if (!/[\u4e00-\u9fa5]/.test(line)) return;
         
-        // Clean up common prefix/suffix glitches (like raw OCR punctuation at start)
-        line = line.replace(/^[^a-zA-Z0-9\u4e00-\u9fa5]+/, '');
-        line = line.replace(/[^a-zA-Z0-9\u4e00-\u9fa5]+$/, '');
+        // Clean up trailing symbols
+        line = line.replace(/[^a-zA-Z0-9\u4e00-\u9fa5\(\)（）]+$/, '');
         
         if (line.length >= 2) {
             merchants.push(line);
