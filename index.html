@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>美团外卖特惠匹配助手</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- FontAwesome for beautiful icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.2/css/all.min.css">
+    <!-- Custom Styles -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header Section -->
+        <header class="app-header">
+            <div class="logo-area">
+                <div class="logo-icon">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i>
+                </div>
+                <div>
+                    <h1>美团特惠匹配</h1>
+                    <p class="subtitle">让返现与津贴在指尖重合</p>
+                </div>
+            </div>
+            <div class="header-actions">
+                <button id="theme-toggle" class="icon-btn" title="切换主题">
+                    <i class="fa-solid fa-moon"></i>
+                </button>
+            </div>
+        </header>
+
+        <!-- Desktop-only QR Code Section (Hidden on Mobile) -->
+        <section id="desktop-qr-panel" class="desktop-only glass-card hide">
+            <div class="qr-container">
+                <div class="qr-info">
+                    <h3><i class="fa-solid fa-mobile-screen-button"></i> 手机扫码使用</h3>
+                    <p>检测到您在电脑端访问。此功能专为手机点外卖场景设计，建议用手机微信扫码，在手机上截图并完成匹配。</p>
+                    <div class="ip-address-box">
+                        <span class="label">局域网网址:</span>
+                        <span id="lan-url-text">获取中...</span>
+                    </div>
+                </div>
+                <div class="qr-image-wrapper">
+                    <img id="qr-code-img" src="" alt="手机扫码二维码">
+                    <div id="qr-loading" class="qr-spinner">
+                        <i class="fa-solid fa-circle-notch fa-spin"></i>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Core Upload Cards -->
+        <main class="main-content">
+            <div class="upload-grid">
+                <!-- Card 1: Cashback (返现) -->
+                <div class="glass-card upload-card cashback-theme">
+                    <div class="card-header">
+                        <div class="card-title">
+                            <span class="badge yellow">1</span>
+                            <h2>返现商家列表</h2>
+                        </div>
+                        <span class="count-badge" id="cashback-count">0 个商家</span>
+                    </div>
+                    <p class="card-desc">上传从“美团返返”或返现页面截取的商家列表图</p>
+                    
+                    <div class="drop-zone" id="cashback-dropzone">
+                        <input type="file" id="cashback-file" accept="image/*" multiple class="file-input">
+                        <div class="drop-zone-content">
+                            <i class="fa-solid fa-images upload-icon"></i>
+                            <p class="primary-text">点击或拖入截图</p>
+                            <p class="secondary-text">支持长截图、多图同时上传</p>
+                        </div>
+                        <div class="preview-container" id="cashback-previews"></div>
+                    </div>
+
+                    <!-- OCR Progress -->
+                    <div class="ocr-progress-container hide" id="cashback-progress-bar">
+                        <div class="progress-info">
+                            <span class="status-text"><i class="fa-solid fa-circle-notch fa-spin"></i> 正在读取图片...</span>
+                            <span class="percentage">0%</span>
+                        </div>
+                        <div class="progress-track">
+                            <div class="progress-fill" style="width: 0%"></div>
+                        </div>
+                    </div>
+
+                    <!-- Editable List -->
+                    <div class="merchant-list-wrapper hide" id="cashback-list-area">
+                        <div class="list-header">
+                            <h3>识别到的商家名字:</h3>
+                            <button class="text-btn clear-btn" id="clear-cashback-btn">清空</button>
+                        </div>
+                        <div class="merchant-tags" id="cashback-tags"></div>
+                        <div class="add-merchant-row">
+                            <input type="text" id="add-cashback-input" placeholder="手动添加商家名字..." class="tag-input">
+                            <button class="add-tag-btn" id="add-cashback-btn"><i class="fa-solid fa-plus"></i></button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Card 2: Allowance (津贴) -->
+                <div class="glass-card upload-card allowance-theme">
+                    <div class="card-header">
+                        <div class="card-title">
+                            <span class="badge green">2</span>
+                            <h2>津贴/满减商家</h2>
+                        </div>
+                        <span class="count-badge" id="allowance-count">0 个商家</span>
+                    </div>
+                    <p class="card-desc">上传从外卖津贴、天天神券等页面截取的商家列表图</p>
+                    
+                    <div class="drop-zone" id="allowance-dropzone">
+                        <input type="file" id="allowance-file" accept="image/*" multiple class="file-input">
+                        <div class="drop-zone-content">
+                            <i class="fa-solid fa-images upload-icon"></i>
+                            <p class="primary-text">点击或拖入截图</p>
+                            <p class="secondary-text">支持长截图、多图同时上传</p>
+                        </div>
+                        <div class="preview-container" id="allowance-previews"></div>
+                    </div>
+
+                    <!-- OCR Progress -->
+                    <div class="ocr-progress-container hide" id="allowance-progress-bar">
+                        <div class="progress-info">
+                            <span class="status-text"><i class="fa-solid fa-circle-notch fa-spin"></i> 正在读取图片...</span>
+                            <span class="percentage">0%</span>
+                        </div>
+                        <div class="progress-track">
+                            <div class="progress-fill" style="width: 0%"></div>
+                        </div>
+                    </div>
+
+                    <!-- Editable List -->
+                    <div class="merchant-list-wrapper hide" id="allowance-list-area">
+                        <div class="list-header">
+                            <h3>识别到的商家名字:</h3>
+                            <button class="text-btn clear-btn" id="clear-allowance-btn">清空</button>
+                        </div>
+                        <div class="merchant-tags" id="allowance-tags"></div>
+                        <div class="add-merchant-row">
+                            <input type="text" id="add-allowance-input" placeholder="手动添加商家名字..." class="tag-input">
+                            <button class="add-tag-btn" id="add-allowance-btn"><i class="fa-solid fa-plus"></i></button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Comparison Dashboard (Always Visible, matching happens reactively) -->
+            <section class="results-section">
+                <div class="section-title-row">
+                    <h2><i class="fa-solid fa-shuffle"></i> 匹配结果对比</h2>
+                    <span class="results-summary-badge" id="match-summary-badge">双重特惠: 0</span>
+                </div>
+                
+                <div id="results-placeholder" class="glass-card placeholder-card">
+                    <i class="fa-solid fa-arrow-up-from-bracket animated-arrow"></i>
+                    <p class="placeholder-main">请在上方上传商家截图</p>
+                    <p class="placeholder-sub">系统会自动使用 OCR 识别并筛选出同时参与两边活动的黄金商家</p>
+                </div>
+
+                <div id="results-display" class="results-list hide">
+                    <!-- Results cards will be dynamically inserted here -->
+                </div>
+            </section>
+        </main>
+
+        <!-- Footer -->
+        <footer class="app-footer">
+            <p>美团特惠匹配助手 • 纯手机端本地 OCR 识别 • 安全隐私无上传</p>
+        </footer>
+    </div>
+
+    <!-- Clipboard feedback toast -->
+    <div id="toast" class="toast-notification hide">
+        <i class="fa-solid fa-check-circle"></i> <span id="toast-text">已复制商家名称</span>
+    </div>
+
+    <!-- Tesseract.js Library -->
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+    <!-- Core Application Logic -->
+    <script src="app.js"></script>
+</body>
+</html>
